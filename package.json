@@ -1,7 +1,7 @@
 {
   "name": "iconcut",
   "version": "1.0.0",
-  "description": "图标生成工具 - 快速生成多尺寸图标",
+  "description": "Icon Generator Tool - Quickly generate multi-size icons",
   "private": true,
   "type": "module",
   "scripts": {

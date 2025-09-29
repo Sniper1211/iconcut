@@ -1,19 +1,35 @@
 import React, { useCallback, useState, useRef } from 'react';
-import { UploadedImage, CropArea } from '../types';
+import { UploadedImage, CropArea, PlatformPreset } from '../types';
+import PlatformSelector from './PlatformSelector';
 
 interface ImageUploadProps {
   onImageUpload: (image: UploadedImage) => void;
   isProcessing: boolean;
   onCropAreaChange?: (cropArea: CropArea | null) => void;
+  uploadedImage?: UploadedImage | null;
+  selectedPlatform?: PlatformPreset | null;
+  onPlatformSelect?: (platform: PlatformPreset) => void;
+  onImageReselect?: () => void;
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, onCropAreaChange }) => {
+const ImageUpload: React.FC<ImageUploadProps> = ({ 
+  onImageUpload, 
+  isProcessing, 
+  onCropAreaChange, 
+  uploadedImage, 
+  selectedPlatform, 
+  onPlatformSelect,
+  onImageReselect
+}) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [isDragReject, setIsDragReject] = useState(false);
   const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(null);
   const [cropArea, setCropArea] = useState<CropArea | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -26,7 +42,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
 
   const handleFile = useCallback(async (file: File) => {
     if (!validateFile(file)) {
-      alert('请上传 PNG 或 JPG 格式的图片，文件大小不超过 10MB');
+      alert('Please upload PNG or JPG format images, file size should not exceed 10MB');
       return;
     }
 
@@ -36,7 +52,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
       
       img.onload = () => {
         setSelectedImage(img);
-        // 设置默认裁剪区域（居中正方形）
+        // Set default crop area (center square)
         const minSize = Math.min(img.width, img.height);
         const x = (img.width - minSize) / 2;
         const y = (img.height - minSize) / 2;
@@ -56,19 +72,19 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
       
       img.onerror = () => {
         URL.revokeObjectURL(imageUrl);
-        alert('图片加载失败，请选择有效的图片文件');
+        alert('Image loading failed, please select a valid image file');
       };
       
       img.src = imageUrl;
     } catch (error) {
-      console.error('处理图片时出错:', error);
-      alert('处理图片时出错，请重试');
+      console.error('Error processing image:', error);
+      alert('Error processing image, please try again');
     }
   }, [onImageUpload, onCropAreaChange]);
 
 
 
-  // 重置裁剪区域
+  // Reset crop area
   const resetCropArea = useCallback(() => {
     if (selectedImage) {
       const minSize = Math.min(selectedImage.width, selectedImage.height);
@@ -80,15 +96,37 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
     }
   }, [selectedImage, onCropAreaChange]);
 
-  // 处理鼠标按下事件
+  // Handle mouse down event
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!selectedImage || !cropArea) return;
+    
+    const target = e.target as HTMLElement;
+    
+    // Check if clicking on a resize handle
+    if (target.classList.contains('resize-handle')) {
+      const handleType = target.className.split(' ').find(cls => 
+        ['nw', 'ne', 'sw', 'se', 'n', 's', 'w', 'e'].includes(cls)
+      );
+      
+      if (handleType) {
+        setIsResizing(true);
+        setResizeHandle(handleType);
+        setResizeStart({
+          x: e.clientX,
+          y: e.clientY,
+          width: cropArea.width,
+          height: cropArea.height
+        });
+        e.preventDefault();
+        return;
+      }
+    }
     
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // 将鼠标坐标转换为图片坐标
+    // Convert mouse coordinates to image coordinates
     const imgRect = imageRef.current?.getBoundingClientRect();
     if (!imgRect) return;
     
@@ -98,7 +136,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
     const imgX = (x - (rect.left - imgRect.left)) * scaleX;
     const imgY = (y - (rect.top - imgRect.top)) * scaleY;
     
-    // 检查是否在裁剪区域内
+    // Check if within crop area
     if (imgX >= cropArea.x && imgX <= cropArea.x + cropArea.width &&
         imgY >= cropArea.y && imgY <= cropArea.y + cropArea.height) {
       setIsDragging(true);
@@ -106,13 +144,9 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
     }
   }, [selectedImage, cropArea]);
 
-  // 处理鼠标移动事件
+  // Handle mouse move event
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging || !selectedImage || !cropArea || !dragStart) return;
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (!selectedImage || !cropArea) return;
     
     const imgRect = imageRef.current?.getBoundingClientRect();
     if (!imgRect) return;
@@ -120,37 +154,116 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
     const scaleX = selectedImage.width / imgRect.width;
     const scaleY = selectedImage.height / imgRect.height;
     
-    const imgX = (x - (rect.left - imgRect.left)) * scaleX;
-    const imgY = (y - (rect.top - imgRect.top)) * scaleY;
+    // Handle resizing
+    if (isResizing && resizeHandle && resizeStart) {
+      const deltaX = (e.clientX - resizeStart.x) * scaleX;
+      const deltaY = (e.clientY - resizeStart.y) * scaleY;
+      
+      let newX = cropArea.x;
+      let newY = cropArea.y;
+      let newWidth = resizeStart.width;
+      let newHeight = resizeStart.height;
+      
+      // Apply resize based on handle type
+      switch (resizeHandle) {
+        case 'se': // Southeast
+          newWidth = Math.max(50, resizeStart.width + deltaX);
+          newHeight = Math.max(50, resizeStart.height + deltaY);
+          break;
+        case 'sw': // Southwest
+          newWidth = Math.max(50, resizeStart.width - deltaX);
+          newHeight = Math.max(50, resizeStart.height + deltaY);
+          newX = cropArea.x + (resizeStart.width - newWidth);
+          break;
+        case 'ne': // Northeast
+          newWidth = Math.max(50, resizeStart.width + deltaX);
+          newHeight = Math.max(50, resizeStart.height - deltaY);
+          newY = cropArea.y + (resizeStart.height - newHeight);
+          break;
+        case 'nw': // Northwest
+          newWidth = Math.max(50, resizeStart.width - deltaX);
+          newHeight = Math.max(50, resizeStart.height - deltaY);
+          newX = cropArea.x + (resizeStart.width - newWidth);
+          newY = cropArea.y + (resizeStart.height - newHeight);
+          break;
+        case 'e': // East
+          newWidth = Math.max(50, resizeStart.width + deltaX);
+          break;
+        case 'w': // West
+          newWidth = Math.max(50, resizeStart.width - deltaX);
+          newX = cropArea.x + (resizeStart.width - newWidth);
+          break;
+        case 's': // South
+          newHeight = Math.max(50, resizeStart.height + deltaY);
+          break;
+        case 'n': // North
+          newHeight = Math.max(50, resizeStart.height - deltaY);
+          newY = cropArea.y + (resizeStart.height - newHeight);
+          break;
+      }
+      
+      // Ensure crop area stays within image bounds
+      newX = Math.max(0, Math.min(newX, selectedImage.width - newWidth));
+      newY = Math.max(0, Math.min(newY, selectedImage.height - newHeight));
+      newWidth = Math.min(newWidth, selectedImage.width - newX);
+      newHeight = Math.min(newHeight, selectedImage.height - newY);
+      
+      const newCropArea: CropArea = {
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight
+      };
+      
+      setCropArea(newCropArea);
+      onCropAreaChange?.(newCropArea);
+      return;
+    }
     
-    // 计算新的裁剪区域位置
-    let newX = imgX - dragStart.x;
-    let newY = imgY - dragStart.y;
-    
-    // 限制边界
-    newX = Math.max(0, Math.min(newX, selectedImage.width - cropArea.width));
-    newY = Math.max(0, Math.min(newY, selectedImage.height - cropArea.height));
-    
-    const newCropArea: CropArea = {
-      ...cropArea,
-      x: newX,
-      y: newY
-    };
-    
-    setCropArea(newCropArea);
-    onCropAreaChange?.(newCropArea);
-  }, [isDragging, selectedImage, cropArea, dragStart, onCropAreaChange]);
+    // Handle dragging
+    if (isDragging && dragStart) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const imgX = (x - (rect.left - imgRect.left)) * scaleX;
+      const imgY = (y - (rect.top - imgRect.top)) * scaleY;
+      
+      // Calculate new crop area position
+      let newX = imgX - dragStart.x;
+      let newY = imgY - dragStart.y;
+      
+      // Limit boundaries
+      newX = Math.max(0, Math.min(newX, selectedImage.width - cropArea.width));
+      newY = Math.max(0, Math.min(newY, selectedImage.height - cropArea.height));
+      
+      const newCropArea: CropArea = {
+        ...cropArea,
+        x: newX,
+        y: newY
+      };
+      
+      setCropArea(newCropArea);
+      onCropAreaChange?.(newCropArea);
+    }
+  }, [isDragging, isResizing, selectedImage, cropArea, dragStart, resizeHandle, resizeStart, onCropAreaChange]);
 
-  // 处理鼠标抬起事件
+  // Handle mouse up event
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setDragStart(null);
+    setIsResizing(false);
+    setResizeHandle(null);
+    setResizeStart(null);
   }, []);
 
-  // 处理鼠标离开事件
+  // Handle mouse leave event
   const handleMouseLeave = useCallback(() => {
     setIsDragging(false);
     setDragStart(null);
+    setIsResizing(false);
+    setResizeHandle(null);
+    setResizeStart(null);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -168,7 +281,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
     e.preventDefault();
     setIsDragActive(true);
     
-    // 检查拖拽的文件类型
+    // Check dragged file type
     if (e.dataTransfer.items) {
       const items = Array.from(e.dataTransfer.items);
       const hasValidFile = items.some(item => 
@@ -194,11 +307,11 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
 
   return (
     <div className="card">
-      <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem', fontWeight: '600' }}>
-        上传图片
-      </h2>
-      
       {!selectedImage ? (
+        <>
+        <h2 className="image-upload-title">
+          Upload Image
+        </h2>
         <div
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -220,10 +333,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
         >
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📁</div>
           <p style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#475569' }}>
-            拖拽图片到此处，或点击选择文件
+            Drag image here, or click to select file
           </p>
           <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem' }}>
-            支持 PNG、JPG 格式，最大 10MB
+            Supports PNG, JPG formats, max 10MB
           </p>
           
           <input
@@ -244,92 +357,118 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
             {isProcessing ? (
               <>
                 <span className="loading"></span>
-                处理中...
+                Processing...
               </>
             ) : (
-              '选择文件'
+              'Select File'
             )}
           </label>
         </div>
+        </>
       ) : (
-        <div>
-          <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '600' }}>选择裁剪区域</h3>
+        <div className='container'>
+          <h2 className="title">
+            {'Select Platform'}
+          </h2>
+          <div className="crop-area-header">
+            <div>
+              {uploadedImage && (
+                <div className="uploaded-image-info">
+                  <div className="uploaded-image-details-small">
+                    <p className="uploaded-image-name-small">
+                      {uploadedImage.file.name}
+                    </p>
+                    <p className="uploaded-image-meta-small">
+                      {uploadedImage.width} × {uploadedImage.height}px • {(uploadedImage.file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
             <button 
-              className="btn btn-secondary"
+              className="btn btn-primary"
               onClick={() => {
                 setSelectedImage(null);
                 setCropArea(null);
                 onCropAreaChange?.(null);
+                onImageReselect?.();
               }}
             >
-              重新选择
+              Reselect Image
             </button>
           </div>
           
-          <div style={{ 
-            border: '1px solid #e2e8f0', 
-            borderRadius: '8px', 
-            padding: '1rem',
-            backgroundColor: '#f8fafc',
-            marginBottom: '1rem'
-          }}>
-            <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1rem' }}>
-              拖动选择框调整裁剪区域，确保重要内容在框内
-            </p>
-            
-            <div 
-              style={{ 
-                position: 'relative', 
-                display: 'inline-block',
-                cursor: isDragging ? 'grabbing' : 'default'
-              }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
-            >
-              <img 
-                ref={imageRef}
-                src={selectedImage.src} 
-                alt="预览" 
-                style={{ 
-                  maxWidth: '100%', 
-                  maxHeight: '300px', 
-                  display: 'block',
-                  borderRadius: '4px'
-                }}
-              />
-              {cropArea && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: `${(cropArea.x / selectedImage.width) * 100}%`,
-                    top: `${(cropArea.y / selectedImage.height) * 100}%`,
-                    width: `${(cropArea.width / selectedImage.width) * 100}%`,
-                    height: `${(cropArea.height / selectedImage.height) * 100}%`,
-                    border: '2px solid #3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                    cursor: isDragging ? 'grabbing' : 'grab'
-                  }}
-                />
-              )}
-            </div>
-            
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button 
-                className="btn btn-secondary"
-                onClick={resetCropArea}
-                style={{ fontSize: '0.9rem' }}
-              >
-                重置为居中
-              </button>
-              <div style={{ fontSize: '0.9rem', color: '#64748b', display: 'flex', alignItems: 'center' }}>
-                当前区域: {cropArea?.width}x{cropArea?.height} 像素
-                {cropArea && ` (位置: ${Math.round(cropArea.x)},${Math.round(cropArea.y)})`}
+          <div className="crop-platform-container">
+            <div className="crop-area-container">
+              <h3 className="crop-area-title">Select Crop Area</h3>
+              
+              <div className="crop-area-main">
+                <p className="crop-area-instructions">
+                  Drag the selection box to move it, or drag the handles to resize. Ensure important content is within the box.
+                </p>
+                
+                <div 
+                  className={`image-preview-container ${isDragging || isResizing ? 'dragging' : ''}`}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  <img 
+                    ref={imageRef}
+                    src={selectedImage.src} 
+                    alt="Preview" 
+                    className="image-preview"
+                  />
+                  {cropArea && (
+                    <div
+                      className={`crop-area-overlay ${isDragging ? 'dragging' : ''}`}
+                      style={{
+                        left: `${(cropArea.x / selectedImage.width) * 100}%`,
+                        top: `${(cropArea.y / selectedImage.height) * 100}%`,
+                        width: `${(cropArea.width / selectedImage.width) * 100}%`,
+                        height: `${(cropArea.height / selectedImage.height) * 100}%`,
+                      }}
+                    >
+                      {/* Resize handles */}
+                      <div className="resize-handle nw"></div>
+                      <div className="resize-handle ne"></div>
+                      <div className="resize-handle sw"></div>
+                      <div className="resize-handle se"></div>
+                      <div className="resize-handle n"></div>
+                      <div className="resize-handle s"></div>
+                      <div className="resize-handle w"></div>
+                      <div className="resize-handle e"></div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="crop-area-controls">
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={resetCropArea}
+                  >
+                    Reset Square
+                  </button>
+                  <div className="crop-area-info">
+                    Current area: {cropArea?.width}x{cropArea?.height} pixels
+                    {cropArea && ` (position: ${Math.round(cropArea.x)},${Math.round(cropArea.y)})`}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+            
+            <div className="platform-section">
+              {/* Platform Selection */}
+              {uploadedImage && onPlatformSelect && (
+                <PlatformSelector
+                  selectedPlatform={selectedPlatform || null}
+                  onPlatformSelect={onPlatformSelect}
+                  disabled={isProcessing}
+                />
+              )}
+             </div>
+           </div>
         </div>
       )}
     </div>

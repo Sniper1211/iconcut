@@ -6,14 +6,14 @@ export class DownloadHelper {
   static async downloadAsZip(icons: ProcessedIcon[], platformName: string) {
     const zip = new JSZip();
     
-    // 创建平台文件夹
+    // Create platform folder
     const folder = zip.folder(platformName);
     
     if (!folder) {
       throw new Error('Failed to create folder in ZIP');
     }
     
-    // 添加所有图标文件到 ZIP
+    // Add all icon files to ZIP
     for (const icon of icons) {
       try {
         const arrayBuffer = await icon.blob.arrayBuffer();
@@ -24,7 +24,7 @@ export class DownloadHelper {
       }
     }
     
-    // 生成 ZIP 文件并下载
+    // Generate ZIP file and download
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     const fileName = `${platformName}-icons-${Date.now()}.zip`;
     
