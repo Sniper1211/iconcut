@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { UploadedImage, CropArea } from '../types';
 
 interface ImageUploadProps {
@@ -14,8 +14,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
   const [cropArea, setCropArea] = useState<CropArea | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+
   const imageRef = useRef<HTMLImageElement>(null);
 
   const validateFile = (file: File): boolean => {
@@ -67,11 +66,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, isProcessing, 
     }
   }, [onImageUpload, onCropAreaChange]);
 
-  // 处理裁剪区域变化
-  const handleCropAreaChange = useCallback((newCropArea: CropArea) => {
-    setCropArea(newCropArea);
-    onCropAreaChange?.(newCropArea);
-  }, [onCropAreaChange]);
+
 
   // 重置裁剪区域
   const resetCropArea = useCallback(() => {
