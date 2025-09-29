@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IconCut - 图标生成工具</title>
+    <meta name="description" content="快速生成多尺寸图标，支持网站Favicon、iOS应用、Android应用图标">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #f8fafc;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            gap: 8px;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #cbd5e1;
+        }
+
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background-color: #059669;
+            transform: translateY(-1px);
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+            margin-bottom: 2rem;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .drag-active {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
+
+        .drag-reject {
+            border-color: #ef4444 !important;
+            background-color: #fef2f2 !important;
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background-color: #f8fafc;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .platform-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .platform-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            cursor: pointer;
+            background-color: white;
+            transition: all 0.2s ease;
+        }
+
+        .platform-card:hover {
+            border-color: #94a3b8;
+        }
+
+        .platform-card.selected {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .icon-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            background-color: #fafafa;
+        }
+
+        .icon-preview {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: white;
+            background-image: url("data:image/svg+xml,%3csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3e%3cdefs%3e%3cpattern id='smallGrid' width='8' height='8' patternUnits='userSpaceOnUse'%3e%3cpath d='M 8 0 L 0 0 0 8' fill='none' stroke='%23e2e8f0' stroke-width='0.5'/%3e%3c/pattern%3e%3c/defs%3e%3crect width='100' height='100' fill='url(%23smallGrid)' /%3e%3c/svg%3e");
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 2rem;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .step-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .step-line {
+            width: 2rem;
+            height: 1px;
+            background-color: #e2e8f0;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .footer {
+            background-color: #1e293b;
+            color: #94a3b8;
+            padding: 2rem 0;
+            margin-top: 4rem;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 16px;
+            }
+            
+            .card {
+                padding: 16px;
+            }
+            
+            .btn {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useCallback } = React;
+
+        // 平台预设配置
+        const PLATFORM_PRESETS = [
+            {
+                id: 'favicon',
+                name: '网站 Favicon',
+                description: '适用于网站图标',
+                sizes: [
+                    { width: 16, height: 16, name: 'favicon-16x16.png' },
+                    { width: 32, height: 32, name: 'favicon-32x32.png' },
+                    { width: 180, height: 180, name: 'apple-touch-icon.png' }
+                ]
+            },
+            {
+                id: 'ios',
+                name: 'iOS 应用',
+                description: '适用于苹果应用商店',
+                sizes: [
+                    { width: 60, height: 60, name: 'ios-60x60.png' },
+                    { width: 120, height: 120, name: 'ios-120x120.png' },
+                    { width: 180, height: 180, name: 'ios-180x180.png' }
+                ]
+            },
+            {
+                id: 'android',
+                name: 'Android 应用',
+                description: '适用于谷歌应用商店',
+                sizes: [
+                    { width: 48, height: 48, name: 'android-48x48.png' },
+                    { width: 96, height: 96, name: 'android-96x96.png' },
+                    { width: 192, height: 192, name: 'android-192x192.png' }
+                ]
+            }
+        ];
+
+        // 图片处理类
+        class ImageProcessor {
+            constructor() {
+                this.canvas = document.createElement('canvas');
+                this.ctx = this.canvas.getContext('2d');
+            }
+
+            async processImage(imageFile, sizes) {
+                const img = await this.loadImage(imageFile);
+                const processedIcons = [];
+
+                for (const size of sizes) {
+                    const blob = await this.resizeImage(img, size);
+                    const url = URL.createObjectURL(blob);
+                    
+                    processedIcons.push({
+                        size,
+                        blob,
+                        url
+                    });
+                }
+
+                return processedIcons;
+            }
+
+            loadImage(file) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = URL.createObjectURL(file);
+                });
+            }
+
+            async resizeImage(img, size) {
+                const { width, height } = size;
+                
+                this.canvas.width = width;
+                this.canvas.height = height;
+                
+                this.ctx.clearRect(0, 0, width, height);
+                
+                const sourceSize = Math.min(img.width, img.height);
+                const sourceX = (img.width - sourceSize) / 2;
+                const sourceY = (img.height - sourceSize) / 2;
+                
+                this.ctx.drawImage(
+                    img,
+                    sourceX, sourceY, sourceSize, sourceSize,
+                    0, 0, width, height
+                );
+                
+                return new Promise((resolve) => {
+                    this.canvas.toBlob((blob) => {
+                        resolve(blob);
+                    }, 'image/png', 1.0);
+                });
+            }
+        }
+
+        // 下载助手类
+        class DownloadHelper {
+            static async downloadAsZip(icons, platformName) {
+                const zip = new JSZip();
+                const folder = zip.folder(platformName);
+                
+                if (!folder) {
+                    throw new Error('Failed to create folder in ZIP');
+                }
+                
+                for (const icon of icons) {
+                    try {
+                        const arrayBuffer = await icon.blob.arrayBuffer();
+                        folder.file(icon.size.name, arrayBuffer);
+                    } catch (error) {
+                        console.error(`Failed to add ${icon.size.name} to ZIP:`, error);
+                        throw new Error(`Failed to process ${icon.size.name}`);
+                    }
+                }
+                
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const fileName = `${platformName}-icons-${Date.now()}.zip`;
+                
+                saveAs(zipBlob, fileName);
+            }
+            
+            static downloadSingle(icon) {
+                saveAs(icon.blob, icon.size.name);
+            }
+        }
+
+        // 头部组件
+        function Header() {
+            return (
+                <header className="header">
+                    <div className="container">
+                        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.5rem', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                            IconCut
+                        </h1>
+                        <p style={{ fontSize: '1.2rem', opacity: 0.9, maxWidth: '600px', margin: '0 auto' }}>
+                            快速生成多尺寸图标 - 支持网站、iOS、Android 平台
+                        </p>
+                    </div>
+                </header>
+            );
+        }
+
+        // 图片上传组件
+        function ImageUpload({ onImageUpload, isProcessing }) {
+            const [isDragActive, setIsDragActive] = useState(false);
+
+            const validateFile = (file) => {
+                const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+                const maxSize = 10 * 1024 * 1024;
+                return validTypes.includes(file.type) && file.size <= maxSize;
+            };
+
+            const handleFile = useCallback(async (file) => {
+                if (!validateFile(file)) {
+                    alert('请上传 PNG 或 JPG 格式的图片，文件大小不超过 10MB');
+                    return;
+                }
+
+                const img = new Image();
+                img.onload = () => {
+                    const uploadedImage = {
+                        file,
+                        url: URL.createObjectURL(file),
+                        width: img.width,
+                        height: img.height
+                    };
+                    onImageUpload(uploadedImage);
+                };
+                img.src = URL.createObjectURL(file);
+            }, [onImageUpload]);
+
+            const handleDrop = useCallback((e) => {
+                e.preventDefault();
+                setIsDragActive(false);
+                
+                const files = Array.from(e.dataTransfer.files);
+                if (files.length > 0) {
+                    handleFile(files[0]);
+                }
+            }, [handleFile]);
+
+            const handleDragOver = useCallback((e) => {
+                e.preventDefault();
+                setIsDragActive(true);
+            }, []);
+
+            const handleDragLeave = useCallback(() => {
+                setIsDragActive(false);
+            }, []);
+
+            const handleFileSelect = useCallback((e) => {
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                    handleFile(files[0]);
+                }
+            }, [handleFile]);
+
+            return (
+                <div className="card">
+                    <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem', fontWeight: '600' }}>
+                        上传图片
+                    </h2>
+                    
+                    <div
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        className={`upload-area ${isDragActive ? 'drag-active' : ''}`}
+                        style={{ opacity: isProcessing ? 0.6 : 1 }}
+                    >
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📁</div>
+                        <p style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#475569' }}>
+                            拖拽图片到此处，或点击选择文件
+                        </p>
+                        <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem' }}>
+                            支持 PNG、JPG 格式，最大 10MB
+                        </p>
+                        
+                        <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg"
+                            onChange={handleFileSelect}
+                            disabled={isProcessing}
+                            style={{ display: 'none' }}
+                            id="file-input"
+                        />
+                        <label htmlFor="file-input" className="btn btn-primary" style={{ cursor: isProcessing ? 'not-allowed' : 'pointer' }}>
+                            {isProcessing ? (
+                                <>
+                                    <span className="loading"></span>
+                                    处理中...
+                                </>
+                            ) : (
+                                '选择文件'
+                            )}
+                        </label>
+                    </div>
+                </div>
+            );
+        }
+
+        // 平台选择组件
+        function PlatformSelector({ selectedPlatform, onPlatformSelect, disabled }) {
+            return (
+                <div className="card">
+                    <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem', fontWeight: '600' }}>
+                        选择平台
+                    </h2>
+                    <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>
+                        选择目标平台以生成对应尺寸的图标
+                    </p>
+                    
+                    <div className="platform-grid">
+                        {PLATFORM_PRESETS.map((platform) => (
+                            <div
+                                key={platform.id}
+                                onClick={() => !disabled && onPlatformSelect(platform)}
+                                className={`platform-card ${selectedPlatform?.id === platform.id ? 'selected' : ''}`}
+                                style={{ opacity: disabled ? 0.6 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
+                            >
+                                <h3 style={{ fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                                    {platform.name}
+                                </h3>
+                                <p style={{ color: '#64748b', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                                    {platform.description}
+                                </p>
+                                <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                                    <strong>包含尺寸：</strong>
+                                    <div style={{ marginTop: '0.5rem' }}>
+                                        {platform.sizes.map((size, index) => (
+                                            <span key={index} style={{
+                                                display: 'inline-block',
+                                                backgroundColor: '#f1f5f9',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                                marginRight: '4px',
+                                                marginBottom: '4px'
+                                            }}>
+                                                {size.width}×{size.height}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // 图标预览组件
+        function IconPreview({ icons, platformName, isProcessing }) {
+            const handleDownloadAll = () => {
+                DownloadHelper.downloadAsZip(icons, platformName);
+            };
+
+            const handleDownloadSingle = (icon) => {
+                DownloadHelper.downloadSingle(icon);
+            };
+
+            if (isProcessing) {
+                return (
+                    <div className="card">
+                        <div style={{ textAlign: 'center', padding: '2rem' }}>
+                            <div className="loading" style={{ width: '40px', height: '40px', margin: '0 auto 1rem' }}></div>
+                            <p style={{ color: '#64748b' }}>正在生成图标...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (icons.length === 0) {
+                return null;
+            }
+
+            return (
+                <div className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: '600' }}>
+                            预览图标
+                        </h2>
+                        <button onClick={handleDownloadAll} className="btn btn-success">
+                            📦 下载全部 ({icons.length} 个)
+                        </button>
+                    </div>
+
+                    <div className="icon-grid">
+                        {icons.map((icon, index) => (
+                            <div key={index} className="icon-item">
+                                <div className="icon-preview">
+                                    <img
+                                        src={icon.url}
+                                        alt={`${icon.size.width}x${icon.size.height}`}
+                                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                                    />
+                                </div>
+                                
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <div style={{ fontWeight: '600', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                                        {icon.size.width} × {icon.size.height}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: '#64748b', wordBreak: 'break-all' }}>
+                                        {icon.size.name}
+                                    </div>
+                                </div>
+                                
+                                <button
+                                    onClick={() => handleDownloadSingle(icon)}
+                                    className="btn btn-secondary"
+                                    style={{ fontSize: '0.8rem', padding: '6px 12px', width: '100%' }}
+                                >
+                                    下载
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // 底部组件
+        function Footer() {
+            return (
+                <footer className="footer">
+                    <div className="container">
+                        <div style={{ marginBottom: '1rem' }}>
+                            <h3 style={{ color: 'white', marginBottom: '0.5rem' }}>IconCut</h3>
+                            <p style={{ fontSize: '0.9rem' }}>
+                                快速、简单、免费的图标生成工具
+                            </p>
+                        </div>
+                        
+                        <div style={{ borderTop: '1px solid #334155', paddingTop: '1rem', fontSize: '0.8rem' }}>
+                            <p>© 2024 IconCut. 纯前端处理，保护您的隐私安全</p>
+                            <p style={{ marginTop: '0.5rem' }}>
+                                支持的格式：PNG, JPG | 处理完全在浏览器本地完成
+                            </p>
+                        </div>
+                    </div>
+                </footer>
+            );
+        }
+
+        // 主应用组件
+        function App() {
+            const [uploadedImage, setUploadedImage] = useState(null);
+            const [selectedPlatform, setSelectedPlatform] = useState(null);
+            const [processedIcons, setProcessedIcons] = useState([]);
+            const [isProcessing, setIsProcessing] = useState(false);
+
+            const handleImageUpload = useCallback((image) => {
+                setUploadedImage(image);
+                setProcessedIcons([]);
+            }, []);
+
+            const handlePlatformSelect = useCallback(async (platform) => {
+                setSelectedPlatform(platform);
+                
+                if (!uploadedImage) return;
+                
+                setIsProcessing(true);
+                
+                try {
+                    const processor = new ImageProcessor();
+                    const icons = await processor.processImage(uploadedImage.file, platform.sizes);
+                    setProcessedIcons(icons);
+                } catch (error) {
+                    console.error('图标处理失败:', error);
+                    alert('图标处理失败，请重试');
+                } finally {
+                    setIsProcessing(false);
+                }
+            }, [uploadedImage]);
+
+            return (
+                <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+                    <Header />
+                    
+                    <main style={{ flex: 1, padding: '2rem 0' }}>
+                        <div className="container">
+                            <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+                                
+                                {/* 步骤指示器 */}
+                                <div className="step-indicator">
+                                    <div className="step" style={{ color: uploadedImage ? '#10b981' : '#64748b' }}>
+                                        <span className="step-number" style={{
+                                            backgroundColor: uploadedImage ? '#10b981' : '#e2e8f0',
+                                            color: uploadedImage ? 'white' : '#64748b'
+                                        }}>1</span>
+                                        <span>上传图片</span>
+                                    </div>
+                                    
+                                    <div className="step-line"></div>
+                                    
+                                    <div className="step" style={{ color: selectedPlatform ? '#10b981' : '#64748b' }}>
+                                        <span className="step-number" style={{
+                                            backgroundColor: selectedPlatform ? '#10b981' : '#e2e8f0',
+                                            color: selectedPlatform ? 'white' : '#64748b'
+                                        }}>2</span>
+                                        <span>选择平台</span>
+                                    </div>
+                                    
+                                    <div className="step-line"></div>
+                                    
+                                    <div className="step" style={{ color: processedIcons.length > 0 ? '#10b981' : '#64748b' }}>
+                                        <span className="step-number" style={{
+                                            backgroundColor: processedIcons.length > 0 ? '#10b981' : '#e2e8f0',
+                                            color: processedIcons.length > 0 ? 'white' : '#64748b'
+                                        }}>3</span>
+                                        <span>下载图标</span>
+                                    </div>
+                                </div>
+
+                                {/* 上传区域 */}
+                                <ImageUpload 
+                                    onImageUpload={handleImageUpload}
+                                    isProcessing={isProcessing}
+                                />
+
+                                {/* 显示上传的图片信息 */}
+                                {uploadedImage && (
+                                    <div className="card">
+                                        <h3 style={{ marginBottom: '1rem', fontSize: '1.2rem', fontWeight: '600' }}>
+                                            已上传图片
+                                        </h3>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                                            <img
+                                                src={uploadedImage.url}
+                                                alt="上传的图片"
+                                                style={{
+                                                    width: '80px',
+                                                    height: '80px',
+                                                    objectFit: 'cover',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #e2e8f0'
+                                                }}
+                                            />
+                                            <div>
+                                                <p style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
+                                                    {uploadedImage.file.name}
+                                                </p>
+                                                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                                                    尺寸: {uploadedImage.width} × {uploadedImage.height} 像素
+                                                </p>
+                                                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                                                    大小: {(uploadedImage.file.size / 1024 / 1024).toFixed(2)} MB
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 平台选择 */}
+                                {uploadedImage && (
+                                    <PlatformSelector
+                                        selectedPlatform={selectedPlatform}
+                                        onPlatformSelect={handlePlatformSelect}
+                                        disabled={isProcessing}
+                                    />
+                                )}
+
+                                {/* 图标预览 */}
+                                {(processedIcons.length > 0 || isProcessing) && selectedPlatform && (
+                                    <IconPreview
+                                        icons={processedIcons}
+                                        platformName={selectedPlatform.name}
+                                        isProcessing={isProcessing}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    </main>
+                    
+                    <Footer />
+                </div>
+            );
+        }
+
+        // 渲染应用 - 使用 React 18 的新 API
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
