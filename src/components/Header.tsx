@@ -23,7 +23,7 @@ const Header: React.FC = () => {
           maxWidth: '600px',
           margin: '0 auto'
         }}>
-          快速生成多尺寸图标 - 支持网站、iOS、Android 平台
+          Quickly generate multi-size icons - Supports website, iOS, Android platforms
         </p>
       </div>
     </header>

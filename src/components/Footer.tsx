@@ -13,7 +13,7 @@ const Footer: React.FC = () => {
         <div style={{ marginBottom: '1rem' }}>
           <h3 style={{ color: 'white', marginBottom: '0.5rem' }}>IconCut</h3>
           <p style={{ fontSize: '0.9rem' }}>
-            快速、简单、免费的图标生成工具
+            Fast, simple, and free icon generator tool
           </p>
         </div>
         
@@ -23,10 +23,10 @@ const Footer: React.FC = () => {
           fontSize: '0.8rem'
         }}>
           <p>
-            © 2024 IconCut. 纯前端处理，保护您的隐私安全
+            © 2024 IconCut. Pure frontend processing, protecting your privacy and security
           </p>
           <p style={{ marginTop: '0.5rem' }}>
-            支持的格式：PNG, JPG | 处理完全在浏览器本地完成
+            Supported formats: PNG, JPG | Processing completely done locally in browser
           </p>
         </div>
       </div>

@@ -39,27 +39,27 @@ export class ImageProcessor {
   private async resizeImage(img: HTMLImageElement, size: IconSize, cropArea?: CropArea): Promise<Blob> {
     const { width, height } = size;
     
-    // 设置画布尺寸
+    // Set canvas size
     this.canvas.width = width;
     this.canvas.height = height;
     
-    // 清空画布
+    // Clear canvas
     this.ctx.clearRect(0, 0, width, height);
     
-    // 计算裁剪区域
+    // Calculate crop area
     let sourceX = 0;
     let sourceY = 0;
     let sourceWidth = img.width;
     let sourceHeight = img.height;
     
     if (cropArea) {
-      // 使用自定义裁剪区域
+      // Use custom crop area
       sourceX = cropArea.x;
       sourceY = cropArea.y;
       sourceWidth = cropArea.width;
       sourceHeight = cropArea.height;
     } else {
-      // 默认居中裁剪
+      // Default center crop
       const sourceSize = Math.min(img.width, img.height);
       sourceX = (img.width - sourceSize) / 2;
       sourceY = (img.height - sourceSize) / 2;
@@ -67,14 +67,14 @@ export class ImageProcessor {
       sourceHeight = sourceSize;
     }
     
-    // 绘制图像
+    // Draw image
     this.ctx.drawImage(
       img,
-      sourceX, sourceY, sourceWidth, sourceHeight,  // 源图像区域
-      0, 0, width, height                          // 目标区域
+      sourceX, sourceY, sourceWidth, sourceHeight,  // Source image area
+      0, 0, width, height                          // Target area
     );
     
-    // 转换为 Blob
+    // Convert to Blob
     return new Promise((resolve, reject) => {
       this.canvas.toBlob((blob) => {
         if (blob) {
@@ -87,7 +87,7 @@ export class ImageProcessor {
   }
 
   cleanup() {
-    // 清理资源
+    // Clean up resources
     this.canvas.remove();
   }
 }

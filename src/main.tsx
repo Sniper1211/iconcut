@@ -3,13 +3,13 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 
-// 确保 root 元素存在
+// Ensure root element exists
 const rootElement = document.getElementById('root')
 if (!rootElement) {
   throw new Error('Root element not found')
 }
 
-// 使用 React 18 的 createRoot API
+// Use React 18's createRoot API
 const root = ReactDOM.createRoot(rootElement)
 root.render(
   <React.StrictMode>
