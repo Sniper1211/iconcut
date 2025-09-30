@@ -15,8 +15,20 @@ A fast, simple, and free icon generator tool that supports generating website fa
 
 ### Website Favicon
 - 16×16 (favicon-16x16.png)
-- 32×32 (favicon-32x32.png)  
+- 32×32 (favicon-32x32.png)
+- 48×48 (favicon-48x48.png)
+- 96×96 (favicon-96x96.png)
+- 144×144 (favicon-144x144.png)
 - 180×180 (apple-touch-icon.png)
+- 192×192 (android-chrome-192x192.png)
+
+### Browser Extension
+- 16×16 (extension-16x16.png)
+- 32×32 (extension-32x32.png)
+- 48×48 (extension-48x48.png)
+- 128×128 (extension-128x128.png)
+- 256×256 (extension-256x256.png)
+- 512×512 (extension-512x512.png)
 
 ### iOS App
 - 60×60 (ios-60x60.png)
@@ -27,6 +39,18 @@ A fast, simple, and free icon generator tool that supports generating website fa
 - 48×48 (android-48x48.png)
 - 96×96 (android-96x96.png)
 - 192×192 (android-192x192.png)
+
+### Complete Icon Set
+- 16×16 (icon-16x16.png)
+- 32×32 (icon-32x32.png)
+- 48×48 (icon-48x48.png)
+- 96×96 (icon-96x96.png)
+- 128×128 (icon-128x128.png)
+- 144×144 (icon-144x144.png)
+- 180×180 (icon-180x180.png)
+- 192×192 (icon-192x192.png)
+- 256×256 (icon-256x256.png)
+- 512×512 (icon-512x512.png)
 
 ## 🛠️ Tech Stack
 
